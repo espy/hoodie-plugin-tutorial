@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Hoodie, in itself, is basically a small, solid core that handles data storage, sync and authentication. Everything else is a modular addition that can be coupled to this core. Our goal is to make Hoodie as extensible as possible, while keeping the core tiny.
+Hoodie is a small core that handles data storage, sync and authentication. Everything else is a plugin that can be added to this core. Our goal is to make Hoodie as extensible as possible, while keeping the core tiny.
 
 ### What is a Hoodie plugin?
 
