@@ -12,7 +12,7 @@ Hoodie plugins have three distinct parts, and you will need at least one of them
 - __A backend component__, written in node.js
 - __An admin view__, which is an HTML fragment with associated styles and JS code that appears in Pocket, your Hoodie app's admin panel
 
-### So what can a Hoodie plugin do?
+### What can a Hoodie plugin do?
 
 In short, anything Hoodie can do. A plugin can work in Hoodie's Node.js backend and manipulate the database or talk to other services, it can extend the Hoodie frontend library's API, and it can appear in Pocket, the admin panel each Hoodie app has, and extend that with new stats, functions and whatever else you can think of.
 
