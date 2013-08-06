@@ -153,7 +153,7 @@ Now it gets a little tricky. We want your plugin API to be able to handle promis
     hoodie.directMessages.add( messageData )
         .then( onMessageSent, onMessageError )
 
-hoodie.defer() basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
+`hoodie.defer()` basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
 
     hoodie.task.add('direct-message', messageData)
     .done( function(messageTask) {
