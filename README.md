@@ -118,17 +118,17 @@ The code inside this is relatively straightforward:
 
         hoodie.task.add('direct-message', messageData)
         .done( function(message) {
-          hoodie.task.on('remove:direct-message:'+message.id, defer.resolve)
-          hoodie.task.on('error:direct-message:'+message.id, defer.reject)
+          hoodie.task.on('remove:direct-message:'+message.id, defer.resolve);
+          hoodie.task.on('error:direct-message:'+message.id, defer.reject);
         })
-        .fail( defer.reject )
+        .fail( defer.reject );
 
-        return defer.promise()
-      }
+        return defer.promise();
+      };
 
       function on( eventName, callback ) {
-        hoodie.task.on( eventName + ':direct-message', callback)
-      }
+        hoodie.task.on( eventName + ':direct-message', callback);
+      };
 
       hoodie.directMessages = {
         add: add,
@@ -151,16 +151,16 @@ Here's our first API method: adding a private message. This method  requires an 
 Now it gets a little tricky. We want your plugin API to be able to handle promises, such as
 
     hoodie.directMessages.add( messageData )
-        .then( onMessageSent, onMessageError )
+        .then( onMessageSent, onMessageError );
 
 `hoodie.defer()` basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
 
     hoodie.task.add('direct-message', messageData)
     .done( function(messageTask) {
-      hoodie.task.on('remove:direct-message:'+messageTask.id, defer.resolve)
-      hoodie.task.on('error:direct-message:'+messageTask.id, defer.reject)
+      hoodie.task.on('remove:direct-message:'+messageTask.id, defer.resolve);
+      hoodie.task.on('error:direct-message:'+messageTask.id, defer.reject);
     })
-    .fail( defer.reject )
+    .fail( defer.reject );
 
 The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a type `direct-message`, as well as the payload from the `hoodie.directMessage.add()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.add()` succeeds.
 
@@ -176,15 +176,15 @@ Lastly, if the `task.add()` fails outright before it even reaches the database, 
 
 Then comes the final part of the `add()` method:
 
-    return defer.promise()
+    return defer.promise();
 
 Which simply passes through the original API call's entire promise.
 
 In order to listen for incoming messages, we also expose an `on()` method, with which we can subscribe to events related to `direct-message` tasks.
 
     function on( eventName, callback ) {
-      hoodie.task.on( eventName + ':direct-message', callback)
-    }
+      hoodie.task.on( eventName + ':direct-message', callback);
+    };
 
 Since the whole `extend()` construct is essentially a module, we'll have to explicitly make our API methods publically available so they can actually be called from the outside, and that's what happens at the very end:
 
