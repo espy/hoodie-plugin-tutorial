@@ -8,8 +8,8 @@ Hoodie, in itself, is basically a small, solid core that handles data storage, s
 
 Hoodie plugins have three distinct parts, and can consist of any or all of them. They are:
 
-- __A backend component__, written in node.js
 - __A frontend component__ that extends the Hoodie API, written in Javascript
+- __A backend component__, written in node.js
 - __An admin view__, which is an HTML fragment with associated styles and JS code that appears in Pocket, your Hoodie app's admin panel
 
 ### So what can a Hoodie plugin do?
@@ -47,27 +47,27 @@ And in your backend component, listen for that task appearing and act upon it:
     hoodie.task.on('new:message', function (dbName, task) {
         // generate a message object from the change data and
         // store it in both users' databases
-
-        // see:  https://gist.github.com/gr2m/6148091
     });
+
+But we're getting ahead of ourselves. Let's do this properly and start at the beginning.
 
 ## Let's Build a Direct Messaging Plugin
 
 ### Where to Start
 
-Any plugins you write live in the `node_modules` directory of your application, with their directory adhering to the following syntax:
+Any plugins you write live in the `node_modules` directory of your application, with their directory name adhering to the following syntax:
 
     [your_application]/node_modules/hoodie-plugin-[plugin-name]
 
 So, for example:
 
-    instamessager/node_modules/hoodie-plugin-direct-messages
+    supermessenger/node_modules/hoodie-plugin-direct-messages
 
-Everything related to your plugin lives in there.
+Everything related to your plugin goes in there.
 
 ### Structuring a Plugin
 
-As stated, your plugin can consist of up to three components: __frontend__, __backend__ and __pocket__. Since it is also ideally fully qualified npm module, we also require a package.json with some information about the plugin.
+As stated, your plugin can consist of up to three components: __frontend__, __backend__ and __pocket__. Since it is also ideally a fully qualified npm module, we also require a `package.json` with some information about the plugin.
 
 Assuming you've got all three components, your plugin's directory should look something like this:
 
@@ -100,9 +100,9 @@ from the browser in any Hoodie app, you can use the plugin's frontend component 
         "body": "One of your stripes is wonky"
     });
 
-(You've noticed I've used directMessages instead of our plugin's actual name "direct-messages", this is because, well, simply: I can. How you extend the hoodie object in the frontend is entirely up to you)
+You've noticed I've used directMessages instead of our plugin's actual name "direct-messages", this is because, well, simply: I can. How and where you extend the hoodie object in the frontend is entirely up to you. Your plugin could even extend Hoodie in multiple places or override existing functionality.
 
-All of your plugin's frontend code must live inside a file named after the following convention:
+All of your plugin's frontend code must live inside a file named according to the following convention:
 
     hoodie.[plugin_name].js
 
@@ -138,13 +138,13 @@ The code inside this is relatively straightforward:
 
 Let's go through this line by line:
 
-    Hoodie.extend('directMessages', function(hoodie) {
+    Hoodie.extend(function(hoodie) {
 
-Here we extend the hoodie object we use in the browser with our new API, which will contain all of our plugin's frontend functionality. It requires a name and a function with all of the API's methods inside. To this we pass the hoodie object itself, so your frontend component can actually use the rest of the Hoodie API.
+Here we extend the hoodie object we use in the browser and also pass a reference to that object back in, so your frontend component can actually use the rest of the Hoodie API.
 
     function add( messageData ) {
 
-Here's our only API method so far: adding a private message. This method will be available in the browser under `hoodie.directMessages.add(messageData)`, and it requires, well, an object with each message's data, just like in the example above. It could require all sorts of things though, after all, it's your plugin, not ours :)
+Here's our first API method: adding a private message. This method  requires an object with each message's data, just like in the example above. It could require all sorts of things though, after all, it's your plugin, not ours :) Note that it won't actually be available for use in the Hoodie API at this point, but we'll get to that later.
 
     var defer = hoodie.defer();
 
@@ -153,7 +153,7 @@ Now it gets a little tricky. We want your plugin API to be able to handle promis
     hoodie.directMessages.add( messageData )
         .then( onMessageSent, onMessageError )
 
-hoodie.defer() basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. But let's look at the next line:
+hoodie.defer() basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
 
     hoodie.task.add('direct-message', messageData)
     .done( function(messageTask) {
@@ -162,7 +162,7 @@ hoodie.defer() basically gives you the promises that were chained behind the act
     })
     .fail( defer.reject )
 
-The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a name ("direct-message"), as well as the payload from the `hoodie.directMessage.add()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.add()` succeeds.
+The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a type `direct-message`, as well as the payload from the `hoodie.directMessage.add()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.add()` succeeds.
 
 Note that the `hoodie.task.on()` listener accepts three different object selectors after the event type:
 
@@ -170,31 +170,30 @@ Note that the `hoodie.task.on()` listener accepts three different object selecto
 * a specific object type: `'remove:direct-message'`
 * a specific individual object `'remove:direct-message:A1B2C3'`
 
-The latter is what we're doing in the current line: listening for the remove and error events of the specific `direct-message` object with the id of the relevant message task. We pass through the promises that were attached to the original API call to handle the events (defer.resolve corresponds to onMessageSent, defer.reject to onMessageError).
+The latter is what we're doing in the current line: listening for the remove and error events of the specific `direct-message` object with the id of the relevant message task. We pass through the promises that were attached to the original API call to handle the events (`defer.resolve` corresponds to `onMessageSent`, `defer.reject` to `onMessageError`).
 
-Lastly, if the task.add fails outright before it even reaches the database, we also call defer.resolve from the .fail() promise of the add method.
+Lastly, if the `task.add()` fails outright before it even reaches the database, we also call `defer.reject` from the `fail()` promise of the `add()` method.
 
-Then comes the final part of the .add method:
+Then comes the final part of the `add()` method:
 
     return defer.promise()
 
 Which simply passes through the original API call's entire promise.
 
-In order to listen for incoming messages, we also expose an `on` method,
-to subscribe to events related to `direct-message` tasks
+In order to listen for incoming messages, we also expose an `on()` method, with which we can subscribe to events related to `direct-message` tasks.
 
     function on( eventName, callback ) {
       hoodie.task.on( eventName + ':direct-message', callback)
     }
 
-Since the whole `extend` construct is essentially a module, we'll have to explicitly make our API method publically available so it can actually be called from the outside, and that's what happens at the very end:
+Since the whole `extend()` construct is essentially a module, we'll have to explicitly make our API methods publically available so they can actually be called from the outside, and that's what happens at the very end:
 
     hoodie.directMessages = {
       add: add,
       on: on
     };
 
-Now `hoodie.directMessages.add()` and `hoodie.directMessages.on()` actually exists. If you've ever seen the revealing module pattern, you know what this is.
+Now `hoodie.directMessages.add()` and `hoodie.directMessages.on()` actually exist. If you've ever seen the revealing module pattern, you know what this is.
 
 That's your frontend component dealt with! Remember, your plugin can consist of only this component, should you just want to encapsulate some more complex abstract frontend code in some convenience functions, for example.
 
@@ -209,4 +208,12 @@ By default, the backend component lives inside a `index.js` file in your plugin'
 
 We didn't want to be too opinionated here.
 
-First things first: this component will be written in node.js,  and node in general tends to be in favor of callbacks and opposed to promises. We respect that and want everyone to feel at home on their turf, which is why all of our backend code is stylistically quite different from the frontend code.
+__First things first__: this component will be written in node.js, and node in general tends to be in favor of callbacks and opposed to promises. We respect that and want everyone to feel at home on their turf, which is why all of our backend code is stylistically quite different from the frontend code.
+
+###
+
+Use Gregor's backend code for this, once I've completely understood it:
+
+https://gist.github.com/gr2m/6148091
+
+###
