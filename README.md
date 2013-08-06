@@ -2,17 +2,17 @@
 
 ## Introduction
 
-Hoodie, in itself, is basically a small, solid core that handles data storage, sync and authentication. Everything else is a modular addition that can be coupled to this core. Our goal is to make Hoodie as extensible as possible, while keeping the core tiny.
+Hoodie is a small core that handles data storage, sync and authentication. Everything else is a plugin that can be added to this core. Our goal is to make Hoodie as extensible as possible, while keeping the core tiny.
 
 ### What is a Hoodie plugin?
 
-Hoodie plugins have three distinct parts, and can consist of any or all of them. They are:
+Hoodie plugins have three distinct parts, and you will need at least one of them. They are:
 
 - __A frontend component__ that extends the Hoodie API, written in Javascript
 - __A backend component__, written in node.js
 - __An admin view__, which is an HTML fragment with associated styles and JS code that appears in Pocket, your Hoodie app's admin panel
 
-### So what can a Hoodie plugin do?
+### What can a Hoodie plugin do?
 
 In short, anything Hoodie can do. A plugin can work in Hoodie's Node.js backend and manipulate the database or talk to other services, it can extend the Hoodie frontend library's API, and it can appear in Pocket, the admin panel each Hoodie app has, and extend that with new stats, functions and whatever else you can think of.
 
@@ -27,7 +27,7 @@ You could…
 
 ## Prerequisites
 
-All you need to write a Hoodie plugin is a running Hoodie app. Your plugin lives directly in the app's `node_modules` directory and must be referenced in its `package.json`, just like any other npm module. You don't have to register and maintain it as an npm module once it is complete, but we'd like to be able to use npm's infrastructure for finding and installing Hoodie plugins, so we'd also like to encourage you to use it as well.
+All you need to write a Hoodie plugin is a running Hoodie app. Your plugin lives directly in the app's `node_modules` directory and must be referenced in its `package.json`, just like any other npm module. You don't have to register and maintain it as an npm module once it is complete, but we'd like to be able to use npm's infrastructure for finding and installing Hoodie plugins, so we'd also like to encourage you to use it as well. See further down for how this needs to look exactly.
 
 ### The Hoodie Architecture
 
@@ -153,7 +153,7 @@ Now it gets a little tricky. We want your plugin API to be able to handle promis
     hoodie.directMessages.add( messageData )
         .then( onMessageSent, onMessageError )
 
-hoodie.defer() basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
+`hoodie.defer()` basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
 
     hoodie.task.add('direct-message', messageData)
     .done( function(messageTask) {
