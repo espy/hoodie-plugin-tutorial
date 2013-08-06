@@ -6,7 +6,7 @@ Hoodie is a small core that handles data storage, sync and authentication. Every
 
 ### What is a Hoodie plugin?
 
-Hoodie plugins have three distinct parts, and can consist of any or all of them. They are:
+Hoodie plugins have three distinct parts, and you will need at least one of them. They are:
 
 - __A frontend component__ that extends the Hoodie API, written in Javascript
 - __A backend component__, written in node.js
