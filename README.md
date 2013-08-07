@@ -55,8 +55,7 @@ But we're getting ahead of ourselves. Let's do this properly and start at the be
 
 ### How Will this Work?
 
-Here's what we want the Hoodie app to be able to do with the plugin, which we'll call `direct-messages`
-:
+Here's what we want the Hoodie app to be able to do with the plugin, which we'll call `direct-messages`:
 
 * Logged in users can send a direct message to any other logged in user
 * Recipient users will see a new message appear in near real time
@@ -68,10 +67,10 @@ In the frontend, we need:
 
 In the backend, we need to:
 
-* check that the recipient exists
-* save the new message to the recipient's database
-* mark the original task as completed
-* if anything goes wrong, update the task accordingly
+1. check that the recipient exists
+2. save the new message to the recipient's database
+3. mark the original task as completed
+4. if anything goes wrong, update the task accordingly
 
 ### Where to Start
 
@@ -103,7 +102,7 @@ Assuming you've got all three components, your plugin's directory should look so
 * `hoodie.direct-messages.js` contains the frontend code
 * `index.js` contains the backend code
 * `/pocket` contains the admin view
-* `package.json` contains the plugin's metadata and dependenceies
+* `package.json` contains the plugin's metadata and dependencies
 
 Let's look at all four in turn:
 
@@ -177,8 +176,13 @@ Now it gets a little tricky. We want your plugin API to be able to handle promis
 
     hoodie.task.add('direct-message', messageData)
     .done( function(messageTask) {
+<<<<<<< HEAD
       hoodie.task.on('remove:direct-message:'+messageTask.id, defer.resolve);
       hoodie.task.on('error:direct-message:'+messageTask.id, defer.reject);
+=======
+      hoodie.task.on('remove', messageTask.id, defer.resolve);
+      hoodie.task.on('error', messageTask.id, defer.reject);
+>>>>>>> 9dc74c41f001a6d55baa1e4ade6cf76bdcd6f0e1
     })
     .fail( defer.reject );
 
@@ -188,7 +192,7 @@ Note that the `hoodie.task.on()` listener accepts three different object selecto
 
 * none, which means any object type: `'remove'`
 * a specific object type: `'remove:direct-message'`
-* a specific individual object `'remove:direct-message:A1B2C3'`
+* a specific individual object `'remove:direct-message:a1b2c3'`
 
 The latter is what we're doing in the current line: listening for the remove and error events of the specific `direct-message` object with the id of the relevant message task. We pass through the promises that were attached to the original API call to handle the events (`defer.resolve` corresponds to `onMessageSent`, `defer.reject` to `onMessageError`).
 
@@ -240,12 +244,12 @@ Let's look at the whole thing first:
 
         hoodie.account.find('user', recipient, function(error, user) {
           if (error) {
-            return hoodie.database(originDb).task.error(message, error);
+            return hoodie.task.error(originDb, message, error);
           };
 
           var targetDb = "user/" + user.ownerHash;
           hoodie.database(targetDb).add('message', message, addMessageCallback);
-          hoodie.task.success(originDb, message, {sentAt: new Date}, handleError);
+          hoodie.task.success(originDb, message, handleError);
         });
       };
 
@@ -272,7 +276,7 @@ Now we're getting into databases. Remember: every user in Hoodie has their own i
 We also need to find the recipient's database, so we can write the message to it. Our `hoodie.directMessages.send()` took a message object with a `to`key for the recipient, and that's what were using here. We're assuming that users are adressing each other by their actual Hoodie usernames and not some other name.
 
     if (error) {
-      return hoodie.database(originDb).task.error(message, error);
+      return hoodie.task.error(originDb, message, error);
     };
 
 The sender may have made a mistake and the recipient may not exist. In this case, we call `task.error()` and pass in the message and the error so we can deal with the problem where neccessary. Remember, this will emit an event that you can listen for both in the front- _and/or_ backend with `task.on()`. In our case, we were just passing them through our plugin's frontend component to let the app author deal with it.
@@ -291,7 +295,7 @@ __Note__: You'll probably be thinking: "wait a second, what if another plugin ge
 
 Right, we're nearly there, we just have to clean up after ourselves:
 
-    hoodie.task.success(originDb, message, {sentAt: new Date}, handleError);
+    hoodie.task.success(originDb, message, handleError);
 
 WIP ->
 
@@ -306,4 +310,3 @@ hoodie.message.on('incoming', showMessageWindow)
 
 https://gist.github.com/gr2m/6148091
 
-###
