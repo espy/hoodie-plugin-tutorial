@@ -176,19 +176,22 @@ Now it gets a little tricky. We want your plugin API to be able to handle promis
 
     hoodie.task.add('direct-message', messageData)
     .done( function(messageTask) {
-<<<<<<< HEAD
+      // current version:
       hoodie.task.on('remove:direct-message:'+messageTask.id, defer.resolve);
       hoodie.task.on('error:direct-message:'+messageTask.id, defer.reject);
-=======
+      // new version by @gr2m
       hoodie.task.on('remove', messageTask.id, defer.resolve);
       hoodie.task.on('error', messageTask.id, defer.reject);
->>>>>>> 9dc74c41f001a6d55baa1e4ade6cf76bdcd6f0e1
     })
     .fail( defer.reject );
 
+# TODO
+I'm currently documenting the new plugins api and incorporating edits by @gr2m , and I'm wondering about the task.on() syntax. It used to take the usual 'eventType:objectType:objectId' string we also use in the frontend in store.on(), now it apparently takes eventType and objectId as separate arguments. What's the reason for this, and would the old way still work?
+# TODO END
+
 The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a type `direct-message`, as well as the payload from the `hoodie.directMessage.send()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.add()` succeeds.
 
-Note that the `hoodie.task.on()` listener accepts three different object selectors after the event type:
+Note that the `hoodie.task.on()` listener accepts three different object selectors after the event type, just like `hoodie.store.on` does in the hoodie.js frontend library:
 
 * none, which means any object type: `'remove'`
 * a specific object type: `'remove:direct-message'`
@@ -256,6 +259,12 @@ Let's look at the whole thing first:
       function addMessageCallback(error, object) {};
     };
 
+# TODO
+
+task.success is called task.finish at the moment. What are we using?
+
+# TODO END
+
 Again, let's go through line by line.
 
     module.exports = function(hoodie) {
@@ -279,11 +288,11 @@ We also need to find the recipient's database, so we can write the message to it
       return hoodie.task.error(originDb, message, error);
     };
 
-The sender may have made a mistake and the recipient may not exist. In this case, we call `task.error()` and pass in the message and the error so we can deal with the problem where neccessary. Remember, this will emit an event that you can listen for both in the front- _and/or_ backend with `task.on()`. In our case, we were just passing them through our plugin's frontend component to let the app author deal with it.
+The sender may have made a mistake and the recipient may not exist. In this case, we call `task.error()` and pass in the message and the error so we can deal with the problem where neccessary. Remember, this will emit an event that you can listen for both in the front- _and/or_ backend with `task.on()`. In our case, we were just passing them through our plugin's frontend component to let the app author deal with it. Internally, Hoodie knows which task the error refers to through the `message` object and its unique id.
 
     var targetDb = "user/" + user.ownerHash;
 
-We still haven't got the recipient's database, which is what we do here. In CouchDB, database names consist of a type prefix (in this case: `user`), a slash, and an id. We'd recommend using Futon to find out what objects and databases are called. Now we get to the main point:
+We still haven't got the recipient's database, which is what we do here. In CouchDB, database names consist of a type prefix (in this case: `user`), a slash, and an id. We'd recommend using Futon to find out what individual objects and databases are called. Now we get to the main point:
 
     hoodie.database(targetDb).add('message', message, addMessageCallback);
 
@@ -297,16 +306,79 @@ Right, we're nearly there, we just have to clean up after ourselves:
 
     hoodie.task.success(originDb, message, handleError);
 
-WIP ->
+Again, Hoodie knows which task `success` refers to through the `message`object and the unique id therein. Once you've called `success` on a task, it will be marked as deleted, and the frontend component, which is listening for `'remove:direct-message:'+message.id'`, will trigger the original API call's success promise. The task's life cycle is complete.
 
-/*
-Here, we're updating the message with… wait a minute. Shouldn't we pass the original task/task id back for this? How does the frontend know which task this refers to? Argh.
-*/
+#### Additional Notes on the Frontend Component and Application Frontend
 
-// handle incoming messages
-hoodie.message.on('incoming', showMessageWindow)
+All that's left to do now is display the message in the recipient user's app view as soon as it is saved to their database. In the application's frontend code, we'd just
 
-###
+    hoodie.store.on('add:message'), function(messageObject){
+      // Show the new message somewhere
+    });
 
-https://gist.github.com/gr2m/6148091
+Really basic Hoodie stuff. You can also call `hoodie.store.findAll('message').done(displayAllMessages)`or any of the other `hoodie.store` methods to work with the new messages objects.
+
+As a plugin author, you could wrap your own methods around these, so app authors can stay within your plugin API's scope even when listening for native Hoodie store events or using the Hoodie core API. For example, in the plugin's frontend component, have:
+
+    function findAll(){
+      var defer = hoodie.defer();
+      hoodie.store.findAll('message')
+      .done(defer.resolve)
+      .fail(defer.reject)
+
+      return defer.promise();
+    }
+
+    hoodie.directMessages = {
+      send: send,
+      findAll: findAll,
+      on: on
+    };
+
+This could then be called by the app author as
+
+    hoodie.directMessages.findAll().done(displayAllMessages)
+
+Now you know how to create and complete tasks, make your plugin promise-friendly, emit and listen for task events, build up your frontend API, write objects to user databases and a couple of other things. I'd say your're well on your way. All other features of the plugin API are waiting in the docs section for you to discover them.
+
+There's more, though: we can build an admin panel for the `direct-messages` plugin.
+
+#### Extending Pocket with your Plugin's own Admin Panel
+
+For this example, let's do something simple and assume we'd want to display some very basic stats:
+
+* total direct messages sent
+* direct messages sent per month
+
+To do this, you must provide a `/pocket` directory in your plugin's root directory, and this should contain a small HTML page, or, more precisely, an HTML fragment. This means an HTML document without `<html>`, `<head>` or `<body>` tags. You can have `<script>`and `<link>` tags in there to load JS and CSS, and Hoodie will automatically inject three more things for your convenience:
+
+1. The hoodie.js frontend library (and jQuery)
+2. A special API called hoodie.admin.js
+3. Pocket's CSS stylesheet
+
+Let's start with the easy bit:
+
+##### Styling your Plugin's Admin Panel
+
+As noted, your admin panel will have Pocket's styles applied by default. Pocket is built with Bootstrap (currently 2.3.2), so all plugin developers can rely on a set of components they know will be sensibly styled by default. You're completely free to override these styles, should you want to do something spectacular.
+
+We're working on a helper plugin called `hoodie-plugin-elements` which is simply a page filled with all elements and components from Bootstrap, in the Pocket style. We'll be using it to test our CSS, plugin developers can use it as a copy and paste snippet library for quickly building their own plugin backends without having to worry about consistency and styling.
+
+# TODO
+
+##### Fetching Admin Data with hoodie.admin
+
+Hoodie.admin needs to be able to find all messages in all user accounts for this, is this currently possible? I'm thinking about something like a global findAll:
+
+    hoodie.admin.store.findAll(function(object){
+      if(object.type === "message"){
+        return true;
+      }
+    }).done(function (objects) {
+      // Count messages, sort by month etc. , show in Pocket
+    });
+
+# TODO END
+
+
 
