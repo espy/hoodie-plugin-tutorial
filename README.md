@@ -376,7 +376,7 @@ We're working on a helper plugin called `hoodie-plugin-elements` which is simply
 
 Pocket has a special version of Hoodie, called HoodieAdmin. It offers several APIs by default, like `hoodieAdmin.signIn(password)`, `hoodie.users.findAll`, and [more](https://github.com/hoodiehq/hoodie.admin.js).
 
-It can be extended just as the standard Hoodie:
+It can be extended just like the standard Hoodie library:
 
     HoodieAdmin.extend(function(hoodieAdmin) {
       function send( messageData ) {
@@ -408,18 +408,20 @@ Now `hoodie.directMessages.send` can be used the same way by the admin in pocket
 
 To get / set a plugin's config, you can use `hoodieAdmin.plugin.getConfig('direct-messages')` & `hoodieAdmin.plugin.updateConfig('direct-messages', config)`. `config` is a simple object with key/value settings.
 
-For example, let's say you'd like to limit the message lenght to 140 characters. You could do that by running
+For example, let's say you'd like to limit the message length to 140 characters. You'd build a corresponding form in your `pocket/index.html` with an input for a number (let's say 140), and bind this to the submit event:
 
-    hoodieAdmin.plugin.updateConfig('direct-messages', { maxLength: 140 })
+    hoodieAdmin.plugin.updateConfig('direct-messages',
+      { maxLength: valueFromInputField }
+    );
 
-Then in the backend, you could check for the setting and reject messages that are longer, with something like that:
+Then in the backend, you could check for the setting and reject messages that are longer:
 
     if (message.body.length > hoodie.config('maxLength')) {
       var error = {
         error: 'invalid',
-        message: 'message too long (max ' + hoodie.config('maxLength') + ' characters)'
-      }
-      return hoodie.task.error(originDb, message, );
+        message: 'Message is too long (hoodie.config('maxLength') + ' characters maximum).'
+      };
+      return hoodie.task.error(originDb, message, error);
     }
 
 #### The package.json
@@ -435,4 +437,4 @@ The package.json is required by node.js. For our plugin, it will look like this:
 
 #### Deploying your Plugin to NPM
 
-As simple as `npm publish`.
+It's as simple as `npm publish`.
