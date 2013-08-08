@@ -374,16 +374,65 @@ We're working on a helper plugin called `hoodie-plugin-elements` which is simply
 
 ##### Sending Messages from Pocket
 
-TODO
+Pocket has a special version of Hoodie, called HoodieAdmin. It offers several APIs by default, like `hoodieAdmin.signIn(password)`, `hoodie.users.findAll`, and [more](https://github.com/hoodiehq/hoodie.admin.js).
+
+It can be extended just as the standard Hoodie:
+
+    HoodieAdmin.extend(function(hoodieAdmin) {
+      function send( messageData ) {
+        var defer = hoodieAdmin.defer();
+
+        hoodieAdmin.task.add('direct-message', messageData)
+        .done( function(message) {
+          hoodieAdmin.task.on('remove:direct-message:'+message.id, defer.resolve);
+          hoodieAdmin.task.on('error:direct-message:'+message.id, defer.reject);
+        })
+        .fail( defer.reject );
+
+        return defer.promise();
+      };
+
+      function on( eventName, callback ) {
+        hoodieAdmin.task.on( eventName + ':direct-message', callback);
+      };
+
+      hoodieAdmin.directMessages = {
+        send: send,
+        on: on
+      };
+    });
+
+Now `hoodie.directMessages.send` can be used the same way by the admin in pocket as it can be used by the users of the app. The only difference is that other users cannot send messages to the admin, as it's a special kind of account.
 
 ##### Getting and Setting Plugin Configurations
 
-TODO
+To get / set a plugin's config, you can use `hoodieAdmin.plugin.getConfig('direct-messages')` & `hoodieAdmin.plugin.updateConfig('direct-messages', config)`. `config` is a simple object with key/value settings.
+
+For example, let's say you'd like to limit the message lenght to 140 characters. You could do that by running
+
+    hoodieAdmin.plugin.updateConfig('direct-messages', { maxLength: 140 })
+
+Then in the backend, you could check for the setting and reject messages that are longer, with something like that:
+
+    if (message.body.length > hoodie.config('maxLength')) {
+      var error = {
+        error: 'invalid',
+        message: 'message too long (max ' + hoodie.config('maxLength') + ' characters)'
+      }
+      return hoodie.task.error(originDb, message, );
+    }
 
 #### The package.json
 
-TODO
+The package.json is required by node.js. For our plugin, it will look like this:
+
+    {
+      "name": "hoodie-plugin-direct-messages",
+      "description": "Allows users to send direct messages to each other",
+      "version": "1.0.0",
+      "main": "worker.js"
+    }
 
 #### Deploying your Plugin to NPM
 
-TODO
+As simple as `npm publish`.
