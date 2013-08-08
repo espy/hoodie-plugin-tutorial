@@ -27,11 +27,11 @@ You could…
 
 ## Prerequisites
 
-All you need to write a Hoodie plugin is a running Hoodie app. Your plugin lives directly in the app's `node_modules` directory and must be referenced in its `package.json`, just like any other npm module. You don't have to register and maintain it as an npm module once it is complete, but we'd like to be able to use npm's infrastructure for finding and installing Hoodie plugins, so we'd also like to encourage you to use it as well. See further down for how this needs to look exactly.
+All you need to write a Hoodie plugin is a running Hoodie app. Your plugin lives directly in the app's `node_modules` directory and must be referenced in its `package.json`, just like any other npm module. You don't have to register and maintain it as an npm module once it is complete, but we'd like to be able to use npm's infrastructure for finding and installing Hoodie plugins, so we'd also like to encourage you to use it as well. We'll explain how to do this at the end of this document.
 
 ### The Hoodie Architecture
 
-If you haven't seen it yet, now is a good time to browse through the explanation of the Hoodie stack, and how it differs from what you might be used to. One of Hoodie's core strengths is that it is offline first, which means the application (and therefore your plugin) should work regardless of the user's connection status. We do this by not letting the frontend send tasks to the backend directly. Instead, the frontend deposits tasks in the database, which, you might remember, is both local and remote and syncs whenever it can. These tasks are then picked up by the backend, which acts upon these tasks. When completed, the database emits corresponding events, which can then in turn be acted upon by the frontend. For this, we provide you with a Plugin API, which handles generating and managing these tasks, as well as a number of other things you'll probably want to do a lot of, like writing stuff to user databases and so on.
+If you haven't seen it yet, now is a good time to browse through [the explanation of the Hoodie stack](http://hood.ie/intro.html), and how it differs from what you might be used to. One of Hoodie's core strengths is that it is offline first, which means the application (and therefore your plugin) should work regardless of the user's connection status. We do this by not letting the frontend send tasks to the backend directly. Instead, the frontend deposits tasks in the database, which, you might remember, is both local and remote and syncs whenever it can. These tasks are then picked up by the backend, which acts upon these tasks. When completed, the database emits corresponding events, which can then in turn be acted upon by the frontend. For this, we provide you with a Plugin API, which handles generating and managing these tasks, as well as a number of other things you'll probably want to do a lot of, like writing stuff to user databases and so on.
 
 ### The Plugin API and Tasks
 
@@ -176,28 +176,40 @@ Now it gets a little tricky. We want your plugin API to be able to handle promis
 
     hoodie.task.add('direct-message', messageData)
     .done( function(messageTask) {
-      // current version:
       hoodie.task.on('remove:direct-message:'+messageTask.id, defer.resolve);
       hoodie.task.on('error:direct-message:'+messageTask.id, defer.reject);
-      // new version by @gr2m
-      hoodie.task.on('remove', messageTask.id, defer.resolve);
-      hoodie.task.on('error', messageTask.id, defer.reject);
     })
     .fail( defer.reject );
 
-# TODO
-I'm currently documenting the new plugins api and incorporating edits by @gr2m , and I'm wondering about the task.on() syntax. It used to take the usual 'eventType:objectType:objectId' string we also use in the frontend in store.on(), now it apparently takes eventType and objectId as separate arguments. What's the reason for this, and would the old way still work?
-# TODO END
-
 The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a type `direct-message`, as well as the payload from the `hoodie.directMessage.send()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.add()` succeeds.
 
-Note that the `hoodie.task.on()` listener accepts three different object selectors after the event type, just like `hoodie.store.on` does in the hoodie.js frontend library:
+__Note:__ the `hoodie.task.on()` listener accepts three different object selectors after the event type, just like `hoodie.store.on` does in the hoodie.js frontend library:
 
-* none, which means any object type: `'remove'`
-* a specific object type: `'remove:direct-message'`
-* a specific individual object `'remove:direct-message:a1b2c3'`
+* none, which means any object type: `'success'`
+* a specific object type: `'success:direct-message'`
+* a specific individual object `'success:direct-message:a1b2c3'`
 
-The latter is what we're doing in the current line: listening for the remove and error events of the specific `direct-message` object with the id of the relevant message task. We pass through the promises that were attached to the original API call to handle the events (`defer.resolve` corresponds to `onMessageSent`, `defer.reject` to `onMessageError`).
+The latter is what we're doing in the current line: listening for the `success` and `error events of the specific `direct-message` object with the id of the relevant message task. We pass through the promises that were attached to the original API call to handle the events (`defer.resolve` corresponds to `onMessageSent`, `defer.reject` to `onMessageError`).
+
+##### An Important Note on Task Events
+
+There's a crucial detail about task event types and where they can occur. __The frontend component__ can listen for:
+
+`add`, `change`, `success` and `error`
+
+The __backend component__, however, can only listen for:
+
+`add` and `change`
+
+It can _call_ `task.success()` and `task.error()` and through this _emit_ these events, but it can't _listen_ for them. This makes sense, because the backend component is where the tasks succeed or fail, so it already always knows when that happens. It's just the frontend component that has to be notified of these events. However, tasks can be added and changed on both sides, which is why both sides can listen for these events. If you're doing something that can succeed or fail on the client side, you don't need tasks to do it.
+
+While we're at it, there's a second backend limitation concerning events: __you can't listen for events from a specific individual object in the backend component of a plugin.__ This will work in the frontend component, but not in the back:
+
+    task.on('success:direct-message:a1b2c3', defer.resolve);
+
+Allowing this behaviour in the backend would generate potentially enormous amounts of callbacks sitting in memory on the server and possibly never being called and removed. We're thinking that the backend components, which are essentially node.js workers, shouldn't be storing state like this anyway. That's what we've got the whole task system for in the first place. So, ideally, this limitation shouldn't be a problem for you.
+
+But for now, back to the original example:
 
 Lastly, if the `task.add()` fails outright before it even reaches the database, we also call `defer.reject` from the `fail()` promise of the `add()` method.
 
@@ -228,6 +240,8 @@ But we have lots of ground to cover, so onward! to the second part:
 
 #### The Direct Messaging Plugin's Backend Component
 
+For reference while reading along, here's the [current state of the Plugin API](https://github.com/hoodiehq/hoodie-plugins-api/blob/master/README.md) as documented on gitHub.
+
 By default, the backend component lives inside a `index.js` file in your plugin's root directory. It can be left there for simplicity, but Hoodie will prefer the following, if present:
 
 * Whatever you reference under `main` in the plugin's `package.json`
@@ -240,7 +254,7 @@ __First things first__: this component will be written in node.js, and node in g
 Let's look at the whole thing first:
 
     module.exports = function(hoodie) {
-      hoodie.task.on('new:direct-message', handleNewMessage);
+      hoodie.task.on('add:direct-message', handleNewMessage);
 
       function handleNewMessage(originDb, message) {
         var recipient = message.to;
@@ -259,19 +273,13 @@ Let's look at the whole thing first:
       function addMessageCallback(error, object) {};
     };
 
-# TODO
-
-task.success is called task.finish at the moment. What are we using?
-
-# TODO END
-
 Again, let's go through line by line.
 
     module.exports = function(hoodie) {
 
 Essentially a boilerplate container for the actual backend component code. Again, we're passing the hoodie object so we can use the API inside the component.
 
-    hoodie.task.on('new:direct-message', handleNewMessage);
+    hoodie.task.on('add:direct-message', handleNewMessage);
 
 Remember when we did `hoodie.task.add('direct-message', messageData)` in the frontend component? This is the corresponding part of the backend, listening to the event emitted by the `task.add()`. We call `handleNewMessage()` when it gets fired:
 
@@ -345,10 +353,10 @@ There's more, though: we can build an admin panel for the `direct-messages` plug
 
 #### Extending Pocket with your Plugin's own Admin Panel
 
-For this example, let's do something simple and assume we'd want to display some very basic stats:
+For this example, let's have an admin panel which
 
-* total direct messages sent
-* direct messages sent per month
+* can send users direct messages
+* has a configurable config setting for maximum message length (because it's working for Twitter, why shouldn't it work for us?)
 
 To do this, you must provide a `/pocket` directory in your plugin's root directory, and this should contain a small HTML page, or, more precisely, an HTML fragment. This means an HTML document without `<html>`, `<head>` or `<body>` tags. You can have `<script>`and `<link>` tags in there to load JS and CSS, and Hoodie will automatically inject three more things for your convenience:
 
@@ -364,21 +372,18 @@ As noted, your admin panel will have Pocket's styles applied by default. Pocket 
 
 We're working on a helper plugin called `hoodie-plugin-elements` which is simply a page filled with all elements and components from Bootstrap, in the Pocket style. We'll be using it to test our CSS, plugin developers can use it as a copy and paste snippet library for quickly building their own plugin backends without having to worry about consistency and styling.
 
-# TODO
+##### Sending Messages from Pocket
 
-##### Fetching Admin Data with hoodie.admin
+TODO
 
-Hoodie.admin needs to be able to find all messages in all user accounts for this, is this currently possible? I'm thinking about something like a global findAll:
+##### Getting and Setting Plugin Configurations
 
-    hoodie.admin.store.findAll(function(object){
-      if(object.type === "message"){
-        return true;
-      }
-    }).done(function (objects) {
-      // Count messages, sort by month etc. , show in Pocket
-    });
+TODO
 
-# TODO END
+#### The package.json
 
+TODO
 
+#### Deploying your Plugin to NPM
 
+TODO
