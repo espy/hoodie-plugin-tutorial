@@ -1,3 +1,7 @@
+# Very Important:
+
+__This document describes functionality and features that don't exist yet.__ Much of it is dreamcode and represents the ideal state we want to work towards. Significant parts might change in the near future. However, feel free to file issues if you have any suggestions or ideas about the plugins API and tasks. 
+
 # Building plugins for Hoodie
 
 ## Introduction
