@@ -41,7 +41,7 @@ If you haven't seen it yet, now is a good time to browse through [the explanatio
 
 Currently, the only way to get the backend component of a plugin to do anything is with a task. A task is a slightly special object that can be saved into the database from the Hoodie frontend. Your plugin's backend component can listen to the events emitted when a task appears, and then do whatever it is you want it to do. You could create a task to send a private message in the frontend, for example:
 
-    hoodie.task.add("message", {
+    hoodie.task.start("message", {
         "to": "Ricardo",
         "body": "Hello there! How are things? We're hurtling through space! Wish you were here :)"
     });
@@ -136,26 +136,9 @@ In our case, this would be
 The code inside this is relatively straightforward:
 
     Hoodie.extend(function(hoodie) {
-      function send( messageData ) {
-        var defer = hoodie.defer();
-
-        hoodie.task.add('direct-message', messageData)
-        .done( function(message) {
-          hoodie.task.on('remove:direct-message:'+message.id, defer.resolve);
-          hoodie.task.on('error:direct-message:'+message.id, defer.reject);
-        })
-        .fail( defer.reject );
-
-        return defer.promise();
-      };
-
-      function on( eventName, callback ) {
-        hoodie.task.on( eventName + ':direct-message', callback);
-      };
-
       hoodie.directMessages = {
-        send: send,
-        on: on
+        send: hoodie.task('direct-message').start,
+        on: hoodie.task('direct-message').on
       };
     });
 
@@ -178,14 +161,14 @@ Now it gets a little tricky. We want your plugin API to be able to handle promis
 
 `hoodie.defer()` basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
 
-    hoodie.task.add('direct-message', messageData)
+    hoodie.task.start('direct-message', messageData)
     .done( function(messageTask) {
       hoodie.task.on('remove:direct-message:'+messageTask.id, defer.resolve);
       hoodie.task.on('error:direct-message:'+messageTask.id, defer.reject);
     })
     .fail( defer.reject );
 
-The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a type `direct-message`, as well as the payload from the `hoodie.directMessage.send()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.add()` succeeds.
+The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a type `direct-message`, as well as the payload from the `hoodie.directMessage.send()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.start()` succeeds.
 
 __Note:__ the `hoodie.task.on()` listener accepts three different object selectors after the event type, just like `hoodie.store.on` does in the hoodie.js frontend library:
 
@@ -215,7 +198,7 @@ Allowing this behaviour in the backend would generate potentially enormous amoun
 
 But for now, back to the original example:
 
-Lastly, if the `task.add()` fails outright before it even reaches the database, we also call `defer.reject` from the `fail()` promise of the `add()` method.
+Lastly, if the `task.start()` fails outright before it even reaches the database, we also call `defer.reject` from the `fail()` promise of the `add()` method.
 
 Then comes the final part of the `send()` method:
 
@@ -285,7 +268,7 @@ Essentially a boilerplate container for the actual backend component code. Again
 
     hoodie.task.on('add:direct-message', handleNewMessage);
 
-Remember when we did `hoodie.task.add('direct-message', messageData)` in the frontend component? This is the corresponding part of the backend, listening to the event emitted by the `task.add()`. We call `handleNewMessage()` when it gets fired:
+Remember when we did `hoodie.task.start('direct-message', messageData)` in the frontend component? This is the corresponding part of the backend, listening to the event emitted by the `task.start()`. We call `handleNewMessage()` when it gets fired:
 
     function handleNewMessage(originDb, message) {
 
@@ -386,7 +369,7 @@ It can be extended just like the standard Hoodie library:
       function send( messageData ) {
         var defer = hoodieAdmin.defer();
 
-        hoodieAdmin.task.add('direct-message', messageData)
+        hoodieAdmin.task.start('direct-message', messageData)
         .done( function(message) {
           hoodieAdmin.task.on('remove:direct-message:'+message.id, defer.resolve);
           hoodieAdmin.task.on('error:direct-message:'+message.id, defer.reject);
