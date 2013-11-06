@@ -1,6 +1,6 @@
 # Very Important:
 
-__This document describes functionality and features that don't exist yet.__ Much of it is dreamcode and represents the ideal state we want to work towards. Significant parts might change in the near future. However, feel free to file issues if you have any suggestions or ideas about the plugins API and tasks. 
+__This document describes functionality and features that don't exist yet.__ Much of it is dreamcode and represents the ideal state we want to work towards. Significant parts might change in the near future. However, feel free to file issues if you have any suggestions or ideas about the plugins API and tasks.
 
 # Building plugins for Hoodie
 
@@ -252,6 +252,8 @@ Let's look at the whole thing first:
           };
 
           var targetDb = "user/" + user.ownerHash;
+          delete message._id;
+          delete message._rev;
           hoodie.database(targetDb).add('message', message, addMessageCallback);
           hoodie.task.success(originDb, message, handleError);
         });
