@@ -41,9 +41,9 @@ If you haven't seen it yet, now is a good time to browse through [the explanatio
 
 Currently, the only way to get the backend component of a plugin to do anything is with a task. A task is a slightly special object that can be saved into the database from the Hoodie frontend. Your plugin's backend component can listen to the events emitted when a task appears, and then do whatever it is you want it to do. You could create a task to send a private message in the frontend, for example:
 
-    hoodie.task.start("message", {
-        "to": "Ricardo",
-        "body": "Hello there! How are things? We're hurtling through space! Wish you were here :)"
+    hoodie.task.start('message', {
+        'to': 'Ricardo',
+        'body': 'Hello there! How are things? We're hurtling through space! Wish you were here :)'
     });
 
 And in your backend component, listen for that task appearing and act upon it:
@@ -114,13 +114,13 @@ Let's look at all four in turn:
 
 This is where you write any extensions to the client side hoodie object, should you require them. In the same way you can do
 
-    hoodie.store.add('zebra', {"name": "Ricardo"});
+    hoodie.store.add('zebra', {'name': 'Ricardo'});
 
 from the browser in any Hoodie app, you can use the plugin's frontend component to expose something like
 
     hoodie.directMessages.send({
-        "to": "Ricardo",
-        "body": "One of your stripes is wonky"
+        'to': 'Ricardo',
+        'body': 'One of your stripes is wonky'
     });
 
 You've noticed I've used directMessages instead of our plugin's actual name "direct-messages", this is because, well, simply: I can. How and where you extend the hoodie object in the frontend is entirely up to you. Your plugin could even extend Hoodie in multiple places or override existing functionality.
@@ -190,7 +190,7 @@ The __backend component__, however, can only listen for:
 
 It can _call_ `task.success()` and `task.error()` and through this _emit_ these events, but it can't _listen_ for them. This makes sense, because the backend component is where the tasks succeed or fail, so it already always knows when that happens. It's just the frontend component that has to be notified of these events. However, tasks can be added and changed on both sides, which is why both sides can listen for these events. If you're doing something that can succeed or fail on the client side, you don't need tasks to do it.
 
-While we're at it, there's a second backend limitation concerning events: __you can't listen for events from a specific individual object in the backend component of a plugin.__ This will work in the frontend component, but not in the back:
+While we're at it, there's a second backend limitation concerning events: __you can't listen for events from a specific individual object in the backend component of a plugin.__ This will work in the frontend component, but not in the backend:
 
     task.on('success:direct-message:a1b2c3', defer.resolve);
 
@@ -251,7 +251,7 @@ Let's look at the whole thing first:
             return hoodie.task.error(originDb, message, error);
           };
 
-          var targetDb = "user/" + user.ownerHash;
+          var targetDb = 'user/' + user.ownerHash;
           hoodie.database(targetDb).add('message', message, addMessageCallback);
           hoodie.task.success(originDb, message, handleError);
         });
@@ -285,7 +285,7 @@ We also need to find the recipient's database, so we can write the message to it
 
 The sender may have made a mistake and the recipient may not exist. In this case, we call `task.error()` and pass in the message and the error so we can deal with the problem where neccessary. Remember, this will emit an event that you can listen for both in the front- _and/or_ backend with `task.on()`. In our case, we were just passing them through our plugin's frontend component to let the app author deal with it. Internally, Hoodie knows which task the error refers to through the `message` object and its unique id.
 
-    var targetDb = "user/" + user.ownerHash;
+    var targetDb = 'user/' + user.ownerHash;
 
 We still haven't got the recipient's database, which is what we do here. In CouchDB, database names consist of a type prefix (in this case: `user`), a slash, and an id. We'd recommend using Futon to find out what individual objects and databases are called. Now we get to the main point:
 
