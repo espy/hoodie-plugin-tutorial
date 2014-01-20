@@ -96,7 +96,7 @@ Assuming you've got all three components, your plugin's directory should look so
 
     hoodie-plugin-direct-messages
         hoodie.direct-messages.js
-        index.js
+        worker.js
         /pocket
             index.html
             styles.css
@@ -104,7 +104,7 @@ Assuming you've got all three components, your plugin's directory should look so
         package.json
 
 * `hoodie.direct-messages.js` contains the frontend code
-* `index.js` contains the backend code
+* `worker.js` contains the backend code
 * `/pocket` contains the admin view
 * `package.json` contains the plugin's metadata and dependencies
 
@@ -229,7 +229,7 @@ But we have lots of ground to cover, so onward! to the second part:
 
 For reference while reading along, here's the [current state of the Plugin API](https://github.com/hoodiehq/hoodie-plugins-api/blob/master/README.md) as documented on gitHub.
 
-By default, the backend component lives inside a `index.js` file in your plugin's root directory. It can be left there for simplicity, but Hoodie will prefer the following, if present:
+By default, the backend component lives inside a `worker.js` file in your plugin's root directory. It can be left there for simplicity, but Hoodie will prefer the following, if present:
 
 * Whatever you reference under `main` in the plugin's `package.json`
 * Whatever you get when you `require()` the plugin root directory
