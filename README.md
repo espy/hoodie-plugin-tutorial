@@ -1,6 +1,6 @@
 # Very Important:
 
-__This document describes functionality and features that don't exist yet.__ Much of it is dreamcode and represents the ideal state we want to work towards. Significant parts might change in the near future. However, feel free to file issues if you have any suggestions or ideas about the plugins API and tasks. 
+__This document describes functionality and features that don't exist yet.__ Much of it is dreamcode and represents the ideal state we want to work towards. Significant parts might change in the near future. However, feel free to file issues if you have any suggestions or ideas about the plugins API and tasks.
 
 # Building plugins for Hoodie
 
@@ -41,14 +41,14 @@ If you haven't seen it yet, now is a good time to browse through [the explanatio
 
 Currently, the only way to get the backend component of a plugin to do anything is with a task. A task is a slightly special object that can be saved into the database from the Hoodie frontend. Your plugin's backend component can listen to the events emitted when a task appears, and then do whatever it is you want it to do. You could create a task to send a private message in the frontend, for example:
 
-    hoodie.task.start('message', {
+    hoodie.task.start('directmessage', {
         'to': 'Ricardo',
         'body': 'Hello there! How are things? We're hurtling through space! Wish you were here :)'
     });
 
 And in your backend component, listen for that task appearing and act upon it:
 
-    hoodie.task.on('new:message', function (dbName, task) {
+    hoodie.task.on('directmessage:add', function (dbName, task) {
         // generate a message object from the change data and
         // store it in both users' databases
     });
@@ -59,15 +59,15 @@ But we're getting ahead of ourselves. Let's do this properly and start at the be
 
 ### How Will this Work?
 
-Here's what we want the Hoodie app to be able to do with the plugin, which we'll call `direct-messages`:
+Here's what we want the Hoodie app to be able to do with the plugin, which we'll call `directmessages`:
 
 * Logged in users can send a direct message to any other logged in user
 * Recipient users will see a new message appear in near real time
 
 In the frontend, we need:
 
-* a `directMessage.send()` method in the Hoodie API to add a task that sends the message
-* a `directMessage.on()` method to listen for events that are fired, for example when a new message appears in the recipient account
+* a `directMessages.send()` method in the Hoodie API to add a task that sends the message
+* an optional `directMessages.on()` method to listen for events that are fired, for example when a new message appears in the recipient account
 
 In the backend, we need to:
 
@@ -133,93 +133,32 @@ In our case, this would be
 
     hoodie.direct-messages.js
 
-The code inside this is relatively straightforward:
+The code inside this is very straightforward:
 
     Hoodie.extend(function(hoodie) {
       hoodie.directMessages = {
-        send: hoodie.task('direct-message').start,
-        on: hoodie.task('direct-message').on
+        send: hoodie.task('directmessage').add,
+        on: hoodie.task('directmessage').on // probably never needed
       };
     });
 
-Let's go through this line by line:
+Now `hoodie.directMessages.send()` and `hoodie.directMessages.on()` actually exist. Here is `send()` in use:
 
-    Hoodie.extend(function(hoodie) {
-
-Here we extend the hoodie object we use in the browser and also pass a reference to that object back in, so your frontend component can actually use the rest of the Hoodie API.
-
-    function send( messageData ) {
-
-Here's our first API method: sending a private message. This method  requires an object with each message's data, just like in the example above. It could require all sorts of things though, after all, it's your plugin, not ours :) Note that it won't actually be available for use in the Hoodie API at this point, but we'll get to that later.
-
-    var defer = hoodie.defer();
-
-Now it gets a little tricky. We want your plugin API to be able to handle promises, such as
-
-    hoodie.directMessages.add( messageData )
-        .then( onMessageSent, onMessageError );
-
-`hoodie.defer()` basically gives you the promises that were chained behind the actual API call, so they don't get lost anywhere and you can call them later. Remember, you're building an API that might get used by people other than yourself, and for consistency, it would be nice if it also worked with promises, just like the rest of the Hoodie frontend API. Let's look at the next line:
-
-    hoodie.task.start('direct-message', messageData)
-    .done( function(messageTask) {
-      hoodie.task.on('remove:direct-message:'+messageTask.id, defer.resolve);
-      hoodie.task.on('error:direct-message:'+messageTask.id, defer.reject);
+    hoodie.directMessages.send(messageData)
+    .done(function(messageTask){
+        // Display a note that the message was sent
     })
-    .fail( defer.reject );
-
-The is a big one, but if you've used Hoodie before, it will look familiar. We're adding a new task and passing it a type `direct-message`, as well as the payload from the `hoodie.directMessage.send()` call. If this succeeds, we register two event listeners, one for the removal of the task, which we'll do once the plugin's backend component has completed it, and a second one for when something goes wrong and the backend returns an error. `messageTask` is simply the task object that gets returned when `hoodie.task.start()` succeeds.
+    .fail(function(error){
+        console.log("Message couldn't be sent: ",error);
+    })
 
 __Note:__ the `hoodie.task.on()` listener accepts three different object selectors after the event type, just like `hoodie.store.on` does in the hoodie.js frontend library:
 
 * none, which means any object type: `'success'`
-* a specific object type: `'success:direct-message'`
-* a specific individual object `'success:direct-message:a1b2c3'`
+* a specific object type: `'directmessage:success'`
+* a specific individual object `'directmessage:a1b2c3:success'`
 
-The latter is what we're doing in the current line: listening for the `success` and `error events of the specific `direct-message` object with the id of the relevant message task. We pass through the promises that were attached to the original API call to handle the events (`defer.resolve` corresponds to `onMessageSent`, `defer.reject` to `onMessageError`).
-
-##### An Important Note on Task Events
-
-There's a crucial detail about task event types and where they can occur. __The frontend component__ can listen for:
-
-`add`, `change`, `success` and `error`
-
-The __backend component__, however, can only listen for:
-
-`add` and `change`
-
-It can _call_ `task.success()` and `task.error()` and through this _emit_ these events, but it can't _listen_ for them. This makes sense, because the backend component is where the tasks succeed or fail, so it already always knows when that happens. It's just the frontend component that has to be notified of these events. However, tasks can be added and changed on both sides, which is why both sides can listen for these events. If you're doing something that can succeed or fail on the client side, you don't need tasks to do it.
-
-While we're at it, there's a second backend limitation concerning events: __you can't listen for events from a specific individual object in the backend component of a plugin.__ This will work in the frontend component, but not in the backend:
-
-    task.on('success:direct-message:a1b2c3', defer.resolve);
-
-Allowing this behaviour in the backend would generate potentially enormous amounts of callbacks sitting in memory on the server and possibly never being called and removed. We're thinking that the backend components, which are essentially node.js workers, shouldn't be storing state like this anyway. That's what we've got the whole task system for in the first place. So, ideally, this limitation shouldn't be a problem for you.
-
-But for now, back to the original example:
-
-Lastly, if the `task.start()` fails outright before it even reaches the database, we also call `defer.reject` from the `fail()` promise of the `add()` method.
-
-Then comes the final part of the `send()` method:
-
-    return defer.promise();
-
-Which simply passes through the original API call's entire promise.
-
-In order to listen for incoming messages, we also expose an `on()` method, with which we can subscribe to events related to `direct-message` tasks.
-
-    function on( eventName, callback ) {
-      hoodie.task.on( eventName + ':direct-message', callback);
-    };
-
-Since the whole `extend()` construct is essentially a module, we'll have to explicitly make our API methods publically available so they can actually be called from the outside, and that's what happens at the very end:
-
-    hoodie.directMessages = {
-      send: send,
-      on: on
-    };
-
-Now `hoodie.directMessages.send()` and `hoodie.directMessages.on()` actually exist. If you've ever seen the revealing module pattern, you know what this is.
+__Important: Task and event names may _only_ contain _lowercase letters_, nothing else.__
 
 That's your frontend component dealt with! Remember, your plugin can consist of only this component, should you just want to encapsulate some more complex abstract frontend code in some convenience functions, for example.
 
@@ -229,35 +168,32 @@ But we have lots of ground to cover, so onward! to the second part:
 
 For reference while reading along, here's the [current state of the Plugin API](https://github.com/hoodiehq/hoodie-plugins-api/blob/master/README.md) as documented on gitHub.
 
-By default, the backend component lives inside a `worker.js` file in your plugin's root directory. It can be left there for simplicity, but Hoodie will prefer the following, if present:
-
-* Whatever you reference under `main` in the plugin's `package.json`
-* Whatever you get when you `require()` the plugin root directory
-
-We didn't want to be too opinionated here.
+By default, the backend component lives inside a `index.js` file in your plugin's root directory. It can be left there for simplicity, but Hoodie will preferentially load whatever you reference under `main` in the plugin's `package.json`.
 
 __First things first__: this component will be written in node.js, and node in general tends to be in favor of callbacks and opposed to promises. We respect that and want everyone to feel at home on their turf, which is why all of our backend code is stylistically quite different from the frontend code.
 
 Let's look at the whole thing first:
 
     module.exports = function(hoodie) {
-      hoodie.task.on('add:direct-message', handleNewMessage);
+      hoodie.task.on('directmessage:add', handleNewMessage);
 
       function handleNewMessage(originDb, message) {
         var recipient = message.to;
-
         hoodie.account.find('user', recipient, function(error, user) {
           if (error) {
             return hoodie.task.error(originDb, message, error);
           };
-
           var targetDb = 'user/' + user.ownerHash;
-          hoodie.database(targetDb).add('message', message, addMessageCallback);
-          hoodie.task.success(originDb, message, handleError);
+          hoodie.database(targetDb).add('directmessage', message, addMessageCallback);
         });
       };
 
-      function addMessageCallback(error, object) {};
+      function addMessageCallback(error, message) {
+        if(error){
+            return hoodie.task.error(originDb, message, error);
+        }
+        return hoodie.task.success(originDb, message);
+      };
     };
 
 Again, let's go through line by line.
@@ -266,9 +202,9 @@ Again, let's go through line by line.
 
 Essentially a boilerplate container for the actual backend component code. Again, we're passing the hoodie object so we can use the API inside the component.
 
-    hoodie.task.on('add:direct-message', handleNewMessage);
+    hoodie.task.on('directmessage:add', handleNewMessage);
 
-Remember when we did `hoodie.task.start('direct-message', messageData)` in the frontend component? This is the corresponding part of the backend, listening to the event emitted by the `task.start()`. We call `handleNewMessage()` when it gets fired:
+Remember when we did `hoodie.task('directmessage').add` in the frontend component? This is the corresponding part of the backend, listening to the event emitted by the `task.('directmessage').add`. We call `handleNewMessage()` when it gets fired:
 
     function handleNewMessage(originDb, message) {
 
@@ -277,62 +213,58 @@ Now we're getting into databases. Remember: every user in Hoodie has their own i
     var recipient = message.to;
     hoodie.account.find('user', recipient, function(error, user) {
 
-We also need to find the recipient's database, so we can write the message to it. Our `hoodie.directMessages.send()` took a message object with a `to`key for the recipient, and that's what were using here. We're assuming that users are adressing each other by their actual Hoodie usernames and not some other name.
+We also need to find the recipient's database, so we can write the message to it. Our `hoodie.directMessages.send()` took a message object with a `to` key for the recipient, and that's what were using here. We're assuming that users are adressing each other by their actual Hoodie usernames and not some other name.
 
     if (error) {
       return hoodie.task.error(originDb, message, error);
     };
 
-The sender may have made a mistake and the recipient may not exist. In this case, we call `task.error()` and pass in the message and the error so we can deal with the problem where neccessary. Remember, this will emit an event that you can listen for both in the front- _and/or_ backend with `task.on()`. In our case, we were just passing them through our plugin's frontend component to let the app author deal with it. Internally, Hoodie knows which task the error refers to through the `message` object and its unique id.
+The sender may have made a mistake and the recipient may not exist. In this case, we call `task.error()` and pass in the message and the error so we can deal with the problem where neccessary. This will emit an `error` event that you can listen for both in the front- _and/or_ the backend with `task.on()`. In our case, we were just passing them through our plugin's frontend component to let the app author deal with it. Internally, Hoodie knows which task the error refers to through the `message` object and its unique id.
 
     var targetDb = 'user/' + user.ownerHash;
 
-We still haven't got the recipient's database, which is what we do here. In CouchDB, database names consist of a type prefix (in this case: `user`), a slash, and an id. We'd recommend using Futon to find out what individual objects and databases are called. Now we get to the main point:
+We still haven't got the recipient's database, which is what we do here. In CouchDB, database names consist of a type prefix (in this case: `user`), a slash, and an id. We recommend using Futon to find out what individual objects and databases are called. Now we get to the main point:
 
-    hoodie.database(targetDb).add('message', message, addMessageCallback);
+    hoodie.database(targetDb).add('directmessage', message, addMessageCallback);
 
 This works a lot like adding an object with the Hoodie frontend API, except we use callbacks instead of promises here. We've added the message data as a `message` object in the recipient's database, and if we're listening to the corresponding `new` event in the frontend, we can make it show up in near realtime.
 
 __Note__: You'll probably be thinking: "wait a second, what if another plugin generates `message` objects too?" and that's very prescient of you. We're not dealing with namespacing here for simplicity's sake, but prefixing your object type names with your plugin name seems like an excellent idea. In that case, this line should read
 
-    hoodie.database(targetDb).add('direct-messages-message', message, addMessageCallback);
+    hoodie.database(targetDb).add('directmessagesmessage', message, addMessageCallback);
 
-Right, we're nearly there, we just have to clean up after ourselves:
+but for clarity, we'll just leave that out in this example.
 
-    hoodie.task.success(originDb, message, handleError);
+Anyway, we're nearly there, we just have to clean up after ourselves:
 
-Again, Hoodie knows which task `success` refers to through the `message`object and the unique id therein. Once you've called `success` on a task, it will be marked as deleted, and the frontend component, which is listening for `'remove:direct-message:'+message.id'`, will trigger the original API call's success promise. The task's life cycle is complete.
+    function addMessageCallback(error, object) {
+        if(error){
+            return hoodie.task.error(originDb, message, error);
+        }
+        return hoodie.task.success(originDb, message);
+    };
+
+Again, Hoodie knows which task `success` refers to through the `message` object and the unique id therein. Once you've called `success` on a task, it will be marked as deleted, and the frontend component (which is listening for `'directmessage:'+message.id+':remove`) will trigger the original API call's success promise. The task's life cycle is complete.
 
 #### Additional Notes on the Frontend Component and Application Frontend
 
 All that's left to do now is display the message in the recipient user's app view as soon as it is saved to their database. In the application's frontend code, we'd just
 
-    hoodie.store.on('add:message'), function(messageObject){
+    hoodie.store.on('directmessage:add'), function(messageObject){
       // Show the new message somewhere
     });
 
-Really basic Hoodie stuff. You can also call `hoodie.store.findAll('message').done(displayAllMessages)`or any of the other `hoodie.store` methods to work with the new messages objects.
+Really basic Hoodie stuff. You can also call `hoodie.store.findAll('directmessage').done(displayAllMessages)`or any of the other `hoodie.store` methods to work with the new messages objects.
 
 As a plugin author, you could wrap your own methods around these, so app authors can stay within your plugin API's scope even when listening for native Hoodie store events or using the Hoodie core API. For example, in the plugin's frontend component, have:
 
-    function findAll(){
-      var defer = hoodie.defer();
-      hoodie.store.findAll('message')
-      .done(defer.resolve)
-      .fail(defer.reject)
-
-      return defer.promise();
-    }
-
-    hoodie.directMessages = {
-      send: send,
-      findAll: findAll,
-      on: on
+    hoodie.directMessages.findAll = function(){
+      return hoodie.store.findAll('directmessage');
     };
 
 This could then be called by the app author as
 
-    hoodie.directMessages.findAll().done(displayAllMessages)
+    hoodie.directMessages.findAll().done(displayAllMessages, showError);
 
 Now you know how to create and complete tasks, make your plugin promise-friendly, emit and listen for task events, build up your frontend API, write objects to user databases and a couple of other things. I'd say your're well on your way. All other features of the plugin API are waiting in the docs section for you to discover them.
 
