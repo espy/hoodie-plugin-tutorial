@@ -14,11 +14,11 @@ Hoodie plugins have three distinct parts, and you will need at least one of them
 
 - __A frontend component__ that extends the Hoodie API, written in Javascript
 - __A backend component__, written in node.js
-- __An admin view__, which is an HTML fragment with associated styles and JS code that appears in Pocket, your Hoodie app's admin panel
+- __An admin view__, which is an HTML fragment with associated styles and JS code that appears in Admin Dashboard, your Hoodie app's admin panel
 
 ### What can a Hoodie plugin do?
 
-In short, anything Hoodie can do. A plugin can work in Hoodie's Node.js backend and manipulate the database or talk to other services, it can extend the Hoodie frontend library's API, and it can appear in Pocket, the admin panel each Hoodie app has, and extend that with new stats, functions and whatever else you can think of.
+In short, anything Hoodie can do. A plugin can work in Hoodie's Node.js backend and manipulate the database or talk to other services, it can extend the Hoodie frontend library's API, and it can appear in Admin Dashboard, the admin panel each Hoodie app has, and extend that with new stats, functions and whatever else you can think of.
 
 ### Example plugins
 
@@ -90,14 +90,14 @@ Everything related to your plugin goes in there.
 
 ### Structuring a Plugin
 
-As stated, your plugin can consist of up to three components: __frontend__, __backend__ and __pocket__. Since it is also ideally a fully qualified npm module, we also require a `package.json` with some information about the plugin.
+As stated, your plugin can consist of up to three components: __frontend__, __backend__ and __admin-dashboard__. Since it is also ideally a fully qualified npm module, we also require a `package.json` with some information about the plugin.
 
 Assuming you've got all three components, your plugin's directory should look something like this:
 
     hoodie-plugin-direct-messages
         hoodie.direct-messages.js
         worker.js
-        /pocket
+        /admin-dashboard
             index.html
             styles.css
             main.js
@@ -105,7 +105,7 @@ Assuming you've got all three components, your plugin's directory should look so
 
 * `hoodie.direct-messages.js` contains the frontend code
 * `worker.js` contains the backend code
-* `/pocket` contains the admin view
+* `/admin-dashboard` contains the admin view
 * `package.json` contains the plugin's metadata and dependencies
 
 Let's look at all four in turn:
@@ -270,32 +270,32 @@ Now you know how to create and complete tasks, make your plugin promise-friendly
 
 There's more, though: we can build an admin panel for the `direct-messages` plugin.
 
-#### Extending Pocket with your Plugin's own Admin Panel
+#### Extending Admin Dashboard with your Plugin's own Admin Panel
 
 For this example, let's have an admin panel which
 
 * can send users direct messages
 * has a configurable config setting for maximum message length (because it's working for Twitter, why shouldn't it work for us?)
 
-To do this, you must provide a `/pocket` directory in your plugin's root directory, and this should contain an `index.html` with whatever you'd like your plugin's admin panel to show.
+To do this, you must provide a `/admin-dashboard` directory in your plugin's root directory, and this should contain an `index.html` with whatever you'd like your plugin's admin panel to show.
 
-##### Pocket UIKit
+##### Admin Dashboard UIKit
 
 Hoodie will provide a UIKit with some useful CSS/JS that you can load if you want. Ideally, you won't have to write a single line of CSS to make your plugin's panel look good, but we're not *quite* there yet.
 
-**Note: this is very new and requires `node_modules/hoodie-server/hoodie-pocket-uikit to have a version >= 2.0.0**
+**Note: this is very new and requires `node_modules/hoodie-server/hoodie-admin-dashboard-uikit to have a version >= 2.0.0**
 
 Here's a preview:
 
-![Screenshot of a plugin styled by the UIKit](pocket_uikit_screenshot.png)
+![Screenshot of a plugin styled by the UIKit](admin_dashboard_uikit_screenshot.png)
 
-Put this in the `<head>`:`<link rel="stylesheet" href="/_api/_plugins/_assets/styles/pocket-uikit.css">
+Put this in the `<head>`:`<link rel="stylesheet" href="/_api/_plugins/_assets/styles/admin-dashboard-uikit.css">
 `
 
-And this before the closing `</body>` tag: `<script src="/_api/_plugins/_assets/scripts/pocket-uikit.js"></script>
+And this before the closing `</body>` tag: `<script src="/_api/_plugins/_assets/scripts/admin-dashboard-uikit.js"></script>
 `
 
-`pocket-uikit.js` includes a bunch of stuff, among them jQuery and the Bootstrap libraries, plus everything to make checkboxes, radio buttons and dropdowns nicer (this is all automatic, don't sweat it).
+`admin-dashboard-uikit.js` includes a bunch of stuff, among them jQuery and the Bootstrap libraries, plus everything to make checkboxes, radio buttons and dropdowns nicer (this is all automatic, don't sweat it).
 
 You'll get some basic styles and behaviour for many elements, but be aware that the UIKit isn't complete yet. For now, check out `http://yourhoodieURL/_api/_plugins/_assets/index.html` in your browser for some example code (This will be refactored into a nicer doc with easy copy and paste of elements and UI blocks soon).
 
@@ -307,11 +307,11 @@ Let's start with the easy bit:
 
 ##### Styling your Plugin's Admin Panel
 
-As noted, your admin panel will have Pocket's styles applied by default. Pocket is built with Bootstrap (currently 2.3.2), so all plugin developers can rely on a set of components they know will be sensibly styled by default. You're completely free to omit these styles, should you want to do something spectacular.
+As noted, your admin panel will have Admin Dashboard's styles applied by default. Admin Dashboard is built with Bootstrap (currently 2.3.2), so all plugin developers can rely on a set of components they know will be sensibly styled by default. You're completely free to omit these styles, should you want to do something spectacular.
 
-##### Sending Messages from Pocket
+##### Sending Messages from Admin Dashboard
 
-Pocket has a special version of Hoodie, called HoodieAdmin. It offers several APIs by default, like `hoodieAdmin.signIn(password)`, `hoodie.users.findAll`, and [more](https://github.com/hoodiehq/hoodie.admin.js).
+Admin Dashboard has a special version of Hoodie, called HoodieAdmin. It offers several APIs by default, like `hoodieAdmin.signIn(password)`, `hoodie.users.findAll`, and [more](https://github.com/hoodiehq/hoodie.admin.js).
 
 It can be extended just like the standard Hoodie library:
 
@@ -339,13 +339,13 @@ It can be extended just like the standard Hoodie library:
       };
     });
 
-Now `hoodie.directMessages.send` can be used the same way by the admin in pocket as it can be used by the users of the app. The only difference is that other users cannot send messages to the admin, as it's a special kind of account.
+Now `hoodie.directMessages.send` can be used the same way by the admin in admin-dashboard as it can be used by the users of the app. The only difference is that other users cannot send messages to the admin, as it's a special kind of account.
 
 ##### Getting and Setting Plugin Configurations
 
 To get / set a plugin's config, you can use `hoodieAdmin.plugin.getConfig('direct-messages')` & `hoodieAdmin.plugin.updateConfig('direct-messages', config)`. `config` is a simple object with key/value settings.
 
-For example, let's say you'd like to limit the message length to 140 characters. You'd build a corresponding form in your `pocket/index.html` with an input for a number (let's say 140), and bind this to the submit event:
+For example, let's say you'd like to limit the message length to 140 characters. You'd build a corresponding form in your `admin-dashboard/index.html` with an input for a number (let's say 140), and bind this to the submit event:
 
     hoodieAdmin.plugin.updateConfig('direct-messages',
       { maxLength: valueFromInputField }
