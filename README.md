@@ -374,9 +374,14 @@ The package.json is required by node.js. For our plugin, it will look like this:
 
 #### Deploying your Plugin to NPM
 
-It's as simple as `npm publish`.
+#### By publishing
 
+You can publish your plugin to npm with `npm publish`, and then install it to your hoodie app by running `npm install hoodie-plugin-direct-messages`.
 
-#### Installing your plugin:
+#### By npm link
 
-Inside your Hoodie application, simply run `npm install hoodie-plugin-direct-messages`.
+You can link to your plugin by running `npm link` (might need a sudo) in the plugin directory. You can then install your plugin by running `npm link hoodie-plugin-direct-messages` (with the name of your plugin) in your hoodie app directory.
+
+#### Installing your plugin
+
+In the hoodie app directory run `hoodie install direct-messages` (without the hoodie-plugin part).
