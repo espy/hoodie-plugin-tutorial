@@ -135,11 +135,13 @@ In our case, this would be
 
 The code inside this is very straightforward:
 
-    Hoodie.extend(function(hoodie) {
+    Hoodie.extend(function(hoodie, doneCallback) {
       hoodie.directMessages = {
         send: hoodie.task('directmessage').add,
         on: hoodie.task('directmessage').on // probably never needed
       };
+      
+      doneCallback();
     });
 
 Now `hoodie.directMessages.send()` and `hoodie.directMessages.on()` actually exist. Here is `send()` in use:
